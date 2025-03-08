@@ -1,66 +1,31 @@
-import os
-import hashlib
-from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter.ttk import Progressbar, Treeview, Style
+from pathlib import Path
+import os
+import sys
 
-def get_file_hash_sha256(file_path):
-    """Compute SHA-256 hash of a file."""
-    sha256 = hashlib.sha256()
-    with open(file_path, 'rb') as f:
-        for block in iter(lambda: f.read(4096), b''):
-            sha256.update(block)
-    return sha256.hexdigest()
+# Ensure the current directory is in the Python path
+sys.path.append(os.path.dirname(__file__))
 
-def find_duplicates(folder_path, progress_var, progress_bar):
-    """Find duplicate files in a folder and its subfolders, keeping only the oldest file."""
-    if not os.path.exists(folder_path):
-        print(f"Folder not found: {folder_path}")
-        return [], []
+from DupeDeleteLogic import (
+    find_duplicates,
+    delete_files,
+    calculate_total_size,
+    save_last_path,
+    load_last_path,
+    get_file_hash_sha256
+)
 
-    file_hashes = {}
-    duplicates = []
-    originals = []
-    total_files = sum([len(files) for _, _, files in os.walk(folder_path)])
-    processed_files = 0
-
-    for root, _, files in os.walk(folder_path):
-        for file in files:
-            full_path = Path(root) / file
-            file_hash = get_file_hash_sha256(full_path)
-            file_modified_date = full_path.stat().st_mtime
-
-            if file_hash in file_hashes:
-                stored_file = file_hashes[file_hash]
-                if file_modified_date > stored_file['date']:
-                    duplicates.append((full_path, file_modified_date))
-                else:
-                    duplicates.append((stored_file['path'], stored_file['date']))
-                    file_hashes[file_hash] = {'path': full_path, 'date': file_modified_date}
-            else:
-                file_hashes[file_hash] = {'path': full_path, 'date': file_modified_date}
-                originals.append((full_path, file_modified_date))
-
-            processed_files += 1
-            progress_var.set((processed_files / total_files) * 100)
-            progress_bar.update()
-
-    return duplicates, originals
-
-def delete_files(files, progress_var, progress_bar):
-    """Delete the specified files."""
-    total_files = len(files)
-    for i, file in enumerate(files):
-        os.remove(file)
-        progress_var.set(((i + 1) / total_files) * 100)
-        progress_bar.update()
+# Print the current working directory for debugging
+print("Current working directory:", os.getcwd())
 
 def browse_folder():
     folder_path = filedialog.askdirectory()
     if folder_path:
         folder_entry.delete(0, tk.END)
         folder_entry.insert(0, folder_path)
+        save_last_path(folder_path)
         list_duplicates()
 
 def refresh_folder():
@@ -130,12 +95,6 @@ def highlight_original(selected_duplicates):
             if get_file_hash_sha256(original_path) == duplicate_hash:
                 originals_treeview.selection_add(item)
                 originals_treeview.see(item)
-                break
-
-def calculate_total_size(files):
-    """Calculate the total size of the specified files."""
-    total_size = sum(file.stat().st_size for file in files)
-    return total_size
 
 def update_space_saving_label():
     """Update the label showing the potential space saving."""
@@ -253,6 +212,12 @@ title_frame.bind("<B1-Motion>", on_move)
 frame.grid_rowconfigure(3, weight=1)
 frame.grid_rowconfigure(5, weight=1)
 frame.grid_columnconfigure(1, weight=1)
+
+# Load the last opened path on startup
+last_path = load_last_path()
+if last_path:
+    folder_entry.insert(0, last_path)
+    list_duplicates()
 
 # Run the application
 root.mainloop()

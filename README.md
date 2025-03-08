@@ -72,6 +72,7 @@
 - The columns in the file list views are resizable.
 - The application uses a dark theme for better visual comfort.
 
+
 ## License
 
 This project is licensed under the MIT License.

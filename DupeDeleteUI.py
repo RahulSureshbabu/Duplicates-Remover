@@ -4,6 +4,7 @@ from tkinter.ttk import Progressbar, Treeview, Style
 from pathlib import Path
 import os
 import sys
+import logging
 
 # Ensure the current directory is in the Python path
 sys.path.append(os.path.dirname(__file__))
@@ -17,8 +18,9 @@ from DupeDeleteLogic import (
     get_file_hash_sha256
 )
 
-# Print the current working directory for debugging
-print("Current working directory:", os.getcwd())
+# Log the current working directory for debugging
+logging.basicConfig(level=logging.INFO)
+logging.info(f"Current working directory: {os.getcwd()}")
 
 def browse_folder():
     folder_path = filedialog.askdirectory()

@@ -1,50 +1,82 @@
 import os
 import hashlib
+import logging
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def get_file_hash_sha256(file_path):
-    """Compute SHA-256 hash of a file."""
-    sha256 = hashlib.sha256()
-    with open(file_path, 'rb') as f:
-        for block in iter(lambda: f.read(4096), b''):
-            sha256.update(block)
-    return sha256.hexdigest()
+def get_file_hash_md5(file_path):
+    """Compute MD5 hash of a file."""
+    try:
+        md5 = hashlib.md5()
+        with open(file_path, 'rb') as f:
+            for block in iter(lambda: f.read(4096), b''):
+                md5.update(block)
+        return md5.hexdigest()
+    except (FileNotFoundError, PermissionError):
+        return None
 
-def find_duplicates(folder_path, progress_var, progress_bar, update_display_callback):
+def find_duplicates(folder_path, progress_var, progress_bar, update_display_callback, start_from_file=None):
     """Find duplicate files in a folder and its subfolders, keeping only the oldest file."""
     if not os.path.exists(folder_path):
-        print(f"Folder not found: {folder_path}")
-        return [], []
+        logging.error(f"Folder not found: {folder_path}")
+        return [], [], None
 
-    file_hashes = {}
-    duplicates = []
-    originals = []
-    total_files = sum([len(files) for _, _, files in os.walk(folder_path)])
-    processed_files = 0
+    try:
+        # Store all files to process for resuming capability
+        if start_from_file is None:
+            all_files = []
+            for root, _, files in os.walk(folder_path):
+                for file in files:
+                    all_files.append(Path(root) / file)
+        else:
+            all_files = start_from_file
 
-    for root, _, files in os.walk(folder_path):
-        for file in files:
-            full_path = Path(root) / file
-            file_hash = get_file_hash_sha256(full_path)
-            file_modified_date = full_path.stat().st_mtime
+        file_hashes = {}
+        duplicates = []
+        originals = []
+        processed_files = 0
+        total_files = len(all_files)
 
-            if file_hash in file_hashes:
-                stored_file = file_hashes[file_hash]
-                if file_modified_date > stored_file['date']:
-                    duplicates.append((full_path, file_modified_date))
-                    originals.append((stored_file['path'], stored_file['date']))
-                else:
-                    duplicates.append((stored_file['path'], stored_file['date']))
-                    file_hashes[file_hash] = {'path': full_path, 'date': file_modified_date}
-                    originals.append((full_path, file_modified_date))
-            else:
-                file_hashes[file_hash] = {'path': full_path, 'date': file_modified_date}
+        with ThreadPoolExecutor() as executor:
+            for full_path in all_files:
+                if update_display_callback and not update_display_callback(str(full_path)):
+                    # Return current state if paused
+                    remaining_files = all_files[processed_files:]
+                    return duplicates, originals, remaining_files
 
-            processed_files += 1
-            progress_var.set((processed_files / total_files) * 100)
-            progress_bar.update()
+                try:
+                    file_hash = get_file_hash_md5(full_path)
+                    if not file_hash:
+                        continue
 
-    return duplicates, originals
+                    file_modified_date = full_path.stat().st_mtime
+                    
+                    if file_hash in file_hashes:
+                        stored_file = file_hashes[file_hash]
+                        if file_modified_date > stored_file['date']:
+                            duplicates.append((full_path, file_modified_date))
+                        else:
+                            duplicates.append((stored_file['path'], stored_file['date']))
+                            file_hashes[file_hash] = {'path': full_path, 'date': file_modified_date}
+                            if (stored_file['path'], stored_file['date']) in originals:
+                                originals.remove((stored_file['path'], stored_file['date']))
+                            originals.append((full_path, file_modified_date))
+                    else:
+                        file_hashes[file_hash] = {'path': full_path, 'date': file_modified_date}
+                        originals.append((full_path, file_modified_date))
+                except Exception as e:
+                    logging.error(f"Error processing file {full_path}: {str(e)}")
+                    continue
+
+                processed_files += 1
+                progress_var.set((processed_files / total_files) * 100)
+                progress_bar.update()
+
+    except Exception as e:
+        logging.error(f"Error in find_duplicates: {str(e)}")
+        return [], [], None
+
+    return duplicates, originals, None
 
 def delete_files(files, progress_var, progress_bar):
     """Delete the specified files."""

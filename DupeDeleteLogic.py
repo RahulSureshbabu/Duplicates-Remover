@@ -10,7 +10,7 @@ def get_file_hash_sha256(file_path):
             sha256.update(block)
     return sha256.hexdigest()
 
-def find_duplicates(folder_path, progress_var, progress_bar):
+def find_duplicates(folder_path, progress_var, progress_bar, update_display_callback):
     """Find duplicate files in a folder and its subfolders, keeping only the oldest file."""
     if not os.path.exists(folder_path):
         print(f"Folder not found: {folder_path}")
@@ -32,12 +32,13 @@ def find_duplicates(folder_path, progress_var, progress_bar):
                 stored_file = file_hashes[file_hash]
                 if file_modified_date > stored_file['date']:
                     duplicates.append((full_path, file_modified_date))
+                    originals.append((stored_file['path'], stored_file['date']))
                 else:
                     duplicates.append((stored_file['path'], stored_file['date']))
                     file_hashes[file_hash] = {'path': full_path, 'date': file_modified_date}
+                    originals.append((full_path, file_modified_date))
             else:
                 file_hashes[file_hash] = {'path': full_path, 'date': file_modified_date}
-                originals.append((full_path, file_modified_date))
 
             processed_files += 1
             progress_var.set((processed_files / total_files) * 100)

@@ -9,6 +9,7 @@
 - **Remember Last Path**: Remembers the last opened folder path between sessions.
 - **Resizable Columns**: Allows resizing of columns in the file list views.
 - **Dark Theme**: Provides a dark-themed user interface.
+- **Export to CSV**: Exports the list of duplicates and their originals to a CSV file.
 - **Executable Generation**: Generates a standalone executable using PyInstaller.
 
 ## Installation
@@ -63,7 +64,10 @@
 7. **Select All Duplicates**:
     - Click the "Select All" button to select all duplicate files.
 
-8. **Close the Application**:
+8. **Export to CSV**:
+    - Click the "Export to CSV" button to export the list of duplicates and their originals to a CSV file.
+
+9. **Close the Application**:
     - Click the "X" button at the top right corner to close the application.
 
 ## Notes
@@ -72,6 +76,9 @@
 - The columns in the file list views are resizable.
 - The application uses a dark theme for better visual comfort.
 
+## Change Log
+
+- Ensured Treeview widgets are properly initialized before use.
 
 ## License
 
